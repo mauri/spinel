@@ -1756,8 +1756,8 @@ int scope_has_return(Compiler *c, int scope_idx) {
 }
 
 /* Resolve a block-bearing CallNode to an INLINE-ABLE yielding user method:
-   mirrors emit_inline_call_x's resolution (free function -> implicit-self
-   chain -> Cls class method -> object-receiver chain) and its
+   mirrors emit_inline_call_x's resolution (implicit-self chain -> free
+   function -> Cls class method -> object-receiver chain) and its
    yields/!return guard. -1 for anything else -- builtin iterators, `loop`,
    `catch`, proc/lambda literals, and methods the inliner would refuse. */
 int call_user_yield_mi(Compiler *c, int id) {
@@ -1767,7 +1767,13 @@ int call_user_yield_mi(Compiler *c, int id) {
   if (!name) return -1;
   int mi = -1;
   if (recv < 0) {
-    mi = comp_method_index(c, name);
+    /* self's own chain first, as emit_inline_call_x resolves it: a top-level
+       `def` is only a private method on Object */
+    { Scope *encl = comp_scope_of(c, id);
+      if (encl && encl->class_id >= 0 && !encl->is_cmethod)
+        mi = comp_method_in_chain(c, encl->class_id, name, NULL);
+    }
+    if (mi < 0) mi = comp_method_index(c, name);
     if (mi < 0) {
       Scope *encl = comp_scope_of(c, id);
       if (encl && encl->class_id >= 0) {

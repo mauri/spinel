@@ -17126,7 +17126,18 @@ else { memcpy(dir, sf, n); dir[n] = 0; } }
     }
   }
 
-  if (recv < 0 && comp_method_index(c, name) >= 0) { emit_method_call(c, id, b); return; }
+  /* A top-level `def` is a private instance method on Object, so a receiverless
+     call resolves against self's own chain first and reaches the free function
+     only when nothing there answers -- which is how infer_type already types
+     these calls (its implicit-self arm precedes its free-function arm).
+     Emitting the free function unconditionally here short-circuited the
+     receiverless cascade below, which resolves self correctly but sits much
+     further down. Inside a class method self is the class, where an instance
+     method is not a candidate and the free function is the right answer.
+     Sibling guard for the top-level-include table: #3795. */
+  if (recv < 0 && comp_method_index(c, name) >= 0 && !self_chain_owns(c, id, name)) {
+    emit_method_call(c, id, b); return;
+  }
   /* bare call to a sibling class method (inside def self.foo, calling bar()) */
   if (recv < 0) {
     Scope *encl = comp_scope_of(c, id);

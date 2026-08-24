@@ -71,7 +71,13 @@ int emit_inline_call_x(Compiler *c, int id, Buf *b, int indent, int as_expr) {
   int mi, recv_class = -1;
   int implicit_self = 0;
   if (recv < 0) {
-    mi = comp_method_index(c, name);     /* free function */
+    /* Self's own chain outranks a same-named top-level `def` -- that def is
+       only a private method on Object -- so try it first, matching the
+       receiverless cascade in emit_call. */
+    int scid = self_chain_owns(c, id, name) ? self_dispatch_class(c, id) : -1;
+    mi = scid >= 0 ? comp_method_in_chain(c, scid, name, NULL) : -1;
+    if (mi >= 0) implicit_self = 1;
+    else mi = comp_method_index(c, name);   /* free function */
     if (mi < 0) {                        /* implicit-self instance method */
       Scope *encl = comp_scope_of(c, id);
       if (encl->class_id >= 0) {

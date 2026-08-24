@@ -7409,6 +7409,37 @@ int is_descendant(Compiler *c, int k, int anc) {
   return 0;
 }
 
+/* The class a receiverless call at `id` dispatches self through: the
+   instance_eval/exec rebinding when there is one, else the class being
+   emitted (a scope transplanted by include belongs to the includer), else the
+   enclosing scope's own class. -1 when self has no instance chain -- top-level
+   code, or a class method, where self is the class and an instance method is
+   not a candidate at all. */
+int self_dispatch_class(Compiler *c, int id) {
+  Scope *encl = comp_scope_of(c, id);
+  if (g_ie_class_id >= 0) return g_ie_class_id;
+  if (encl->is_cmethod) return -1;
+  if (g_emitting_class_id >= 0) return g_emitting_class_id;
+  return encl->class_id;
+}
+
+/* Whether self's own chain answers `name` for a receiverless call at `id`:
+   an attr_reader, a method up the ancestor chain, or -- the template-method
+   pattern -- an implementation in a descendant that emit_dispatch resolves on
+   self's runtime class. Callers use it to decide whether a same-named
+   top-level `def` (only a private method on Object) is reachable at all. */
+int self_chain_owns(Compiler *c, int id, const char *name) {
+  int cid = self_dispatch_class(c, id);
+  if (cid < 0) return 0;
+  if (comp_reader_in_chain(c, cid, name, NULL)) return 1;
+  if (comp_method_in_chain(c, cid, name, NULL) >= 0) return 1;
+  if (comp_scope_of(c, id)->is_cmethod) return 0;
+  for (int k = 0; k < c->nclasses; k++)
+    if (k != cid && is_descendant(c, k, cid) &&
+        comp_method_in_chain(c, k, name, NULL) >= 0) return 1;
+  return 0;
+}
+
 /* Number of distinct implementations of `name` across cid's subtree
    (cid + all descendants). >1 means a self/obj call needs runtime dispatch. */
 int dispatch_impl_count(Compiler *c, int cid, const char *name) {

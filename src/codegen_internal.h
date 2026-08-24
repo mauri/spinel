@@ -663,6 +663,8 @@ int kwh_positional_slot(Compiler *c, Scope *m, int kwh, int pos_argc);
 void emit_array_elem_at(TyKind at, int tmp, int elem_idx, Buf *b);
 void emit_rest_from_splat_and_argv(int tmp, TyKind at, int from_idx, Compiler *c, int argv_from, int pos_argc, const int *argv, Buf *b);
 int is_descendant(Compiler *c, int k, int anc);
+int self_dispatch_class(Compiler *c, int id);
+int self_chain_owns(Compiler *c, int id, const char *name);
 int dispatch_impl_count(Compiler *c, int cid, const char *name);
 void emit_dispatch(Compiler *c, int cid, const char *name, const char *selfptr, int argsNode, int blk_node, Buf *b);
 int emit_group_by_expr(Compiler *c, int id, Buf *b);
